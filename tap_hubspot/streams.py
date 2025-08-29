@@ -1279,6 +1279,12 @@ class DealStream(DynamicIncrementalHubspotStream):
         return "https://api.hubapi.com/crm/v3"
 
     @property
+    def page_size(self) -> int:
+        """Return smaller page size for deals to reduce memory usage per request."""
+        # Reduce from default 1000 to 200 to lower memory pressure per API call
+        return 200
+
+    @property
     def schema(self) -> dict:
         """Return schema with additional association properties at root level."""
         # Get the base schema from parent
@@ -1373,17 +1379,16 @@ class DealStream(DynamicIncrementalHubspotStream):
         if not deal_ids:
             return {}, {}
 
-        # Split into batches (1000 for contacts, 100 for companies per HubSpot limits)
-        contact_batches = [
-            deal_ids[i : i + 1000] for i in range(0, len(deal_ids), 1000)
-        ]
-        company_batches = [deal_ids[i : i + 100] for i in range(0, len(deal_ids), 100)]
+        # Split into smaller batches to reduce memory usage and API pressure
+        # (500 for contacts, 50 for companies - more conservative than HubSpot limits)
+        contact_batches = [deal_ids[i : i + 500] for i in range(0, len(deal_ids), 500)]
+        company_batches = [deal_ids[i : i + 50] for i in range(0, len(deal_ids), 50)]
 
         contact_associations = {}
         company_associations = {}
 
-        # Use ThreadPoolExecutor for parallel requests
-        with ThreadPoolExecutor(max_workers=4) as executor:
+        # Use ThreadPoolExecutor with fewer workers to reduce memory pressure
+        with ThreadPoolExecutor(max_workers=2) as executor:
             # Submit all contact batch requests
             contact_futures = [
                 executor.submit(self._fetch_associations, batch, "contacts")
@@ -1419,24 +1424,64 @@ class DealStream(DynamicIncrementalHubspotStream):
         return contact_associations, company_associations
 
     def get_records(self, context: Context | None) -> t.Iterable[dict[str, t.Any]]:
-        """Get records and process them with associations in batches."""
-        # Get all records from parent
-        records = list(super().get_records(context))
+        """Get records and process them with associations in streaming batches."""
+        # Process records in smaller batches to avoid memory issues
+        BATCH_SIZE = 200  # Process 200 deals at a time - conservative for memory usage
 
-        if not records:
-            return records
+        batch_records = []
+        batch_deal_ids = []
 
-        # Extract deal IDs
-        deal_ids = [record.get("id") for record in records if record.get("id")]
+        # Stream records and process in batches
+        for record in super().get_records(context):
+            batch_records.append(record)
+            if record.get("id"):
+                batch_deal_ids.append(record["id"])
 
-        if deal_ids:
-            # Fetch all associations in parallel batches
+            # When we reach batch size, process the batch
+            if len(batch_records) >= BATCH_SIZE:
+                # Process this batch and yield results
+                yield from self._process_batch_with_associations(
+                    batch_records, batch_deal_ids
+                )
+
+                # Reset for next batch and explicit cleanup
+                batch_records.clear()
+                batch_deal_ids.clear()
+                batch_records = []
+                batch_deal_ids = []
+
+        # Process final batch if any records remain
+        if batch_records:
+            yield from self._process_batch_with_associations(
+                batch_records, batch_deal_ids
+            )
+            # Final cleanup
+            batch_records.clear()
+            batch_deal_ids.clear()
+
+    def _process_batch_with_associations(
+        self, batch_records: list[dict[str, t.Any]], batch_deal_ids: list[str]
+    ) -> t.Iterable[dict[str, t.Any]]:
+        """Process a batch of records with their associations."""
+        if not batch_deal_ids:
+            # No associations to fetch, yield records as-is
+            for record in batch_records:
+                # Still add empty association fields for consistency
+                record["associatedvids"] = []
+                record["associatedvid"] = None
+                record["associatedCompanyIds"] = []
+                record["associatedCompanyId"] = None
+                yield record
+            return
+
+        try:
+            # Fetch associations for this batch
             contact_associations, company_associations = (
-                self._batch_fetch_all_associations(deal_ids)
+                self._batch_fetch_all_associations(batch_deal_ids)
             )
 
-            # Add associations to each record
-            for record in records:
+            # Add associations to each record in the batch
+            for record in batch_records:
                 deal_id = record.get("id")
                 if deal_id:
                     contact_ids = contact_associations.get(deal_id, [])
@@ -1451,8 +1496,27 @@ class DealStream(DynamicIncrementalHubspotStream):
                     record["associatedCompanyId"] = (
                         company_ids[0] if company_ids else None
                     )
+                else:
+                    # No deal ID, set empty associations
+                    record["associatedvids"] = []
+                    record["associatedvid"] = None
+                    record["associatedCompanyIds"] = []
+                    record["associatedCompanyId"] = None
 
-        return records
+                yield record
+
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to fetch associations for batch: {e}. Continuing without associations for this batch."
+            )
+            # If association fetching fails, yield records without associations
+            for record in batch_records:
+                # Set empty associations but still yield the record
+                record["associatedvids"] = []
+                record["associatedvid"] = None
+                record["associatedCompanyIds"] = []
+                record["associatedCompanyId"] = None
+                yield record
 
 
 class FeedbackSubmissionsStream(HubspotStream):
