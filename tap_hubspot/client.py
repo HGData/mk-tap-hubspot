@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import os
 import sys
 import typing as t
 from functools import cached_property
@@ -67,6 +68,11 @@ class HubspotStream(RESTStream):
         if "user_agent" in self.config:
             headers["User-Agent"] = self.config.get("user_agent")
         return headers
+
+    def post_process(self, row: dict, context: t.Any = None) -> dict | None:
+        """Inject the run's partition timestamp into every record."""
+        row["dt"] = os.environ.get("CURRENT_DATE_MINUTE_LEVEL")
+        return row
 
     def get_new_paginator(self) -> BaseAPIPaginator:
         """Create a new pagination helper instance.
@@ -148,6 +154,7 @@ class DynamicHubspotStream(HubspotStream):
             th.Property("createdAt", th.DateTimeType),
             th.Property("updatedAt", th.DateTimeType),
             th.Property("archived", th.BooleanType),
+            th.Property("dt", th.StringType),
         )
         return schema.to_dict()
 
@@ -216,6 +223,7 @@ class DynamicIncrementalHubspotStream(DynamicHubspotStream):
             th.Property("createdAt", th.DateTimeType),
             th.Property("updatedAt", th.DateTimeType),
             th.Property("archived", th.BooleanType),
+            th.Property("dt", th.StringType),
         )
         if self.replication_key:
             schema.append(
@@ -260,6 +268,9 @@ class DynamicIncrementalHubspotStream(DynamicHubspotStream):
         Returns:
             The resulting record dict, or `None` if the record should be excluded.
         """
+        row = super().post_process(row, context)
+        if row is None:
+            return None
         if self.replication_key:
             val = None
             if props := row.get("properties"):
