@@ -1999,6 +1999,7 @@ class EmailEventsStream(HubspotStream):
             ),
         ),
         Property("portalSubscriptionStatus", StringType),
+        Property("dt", StringType),
     ).to_dict()
 
     @property
@@ -2150,6 +2151,10 @@ class EmailEventsStream(HubspotStream):
         context: Context | None = None,
     ) -> dict | None:
         """Process browser fields to handle arrays and clean up data."""
+        row = super().post_process(row, context)
+        if row is None:
+            return None
+
         # Handle browser object fields that might be arrays
         if "browser" in row and isinstance(row["browser"], dict):
             browser = row["browser"]
@@ -2322,6 +2327,7 @@ class WebEventsStream(HubspotStream):
                 Property("hs_custom_metric_5", NumberType),
             ),
         ),
+        Property("dt", StringType),
     ).to_dict()
 
     @property
@@ -2569,6 +2575,10 @@ class WebEventsStream(HubspotStream):
         context: Context | None = None,
     ) -> dict | None:
         """Process web event records."""
+        row = super().post_process(row, context)
+        if row is None:
+            return None
+
         # Convert occurredAt to datetime format if it's a timestamp
         if "occurredAt" in row and isinstance(row["occurredAt"], int):
             row["occurredAt"] = datetime.datetime.fromtimestamp(
