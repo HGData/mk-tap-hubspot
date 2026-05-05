@@ -33,9 +33,14 @@ class HubspotStream(RESTStream):
     """tap-hubspot stream class."""
 
     @property
+    def _api_base(self) -> str:
+        """Host root without trailing slash, overridable for local simulator."""
+        return os.environ.get("TAP_HUBSPOT_BASE_URL", "https://api.hubapi.com").rstrip("/")
+
+    @property
     def url_base(self) -> str:
         """Returns base url."""
-        return "https://api.hubapi.com/"
+        return self._api_base + "/"
 
     records_jsonpath = "$[*]"  # Or override `parse_response`.
 
@@ -49,9 +54,10 @@ class HubspotStream(RESTStream):
             An authenticator instance.
         """
         if "refresh_token" in self.config:
+            base = os.environ.get("TAP_HUBSPOT_BASE_URL", "https://api.hubapi.com")
             return HubSpotOAuthAuthenticator(
                 self,
-                auth_endpoint="https://api.hubapi.com/oauth/v1/token",
+                auth_endpoint=f"{base.rstrip('/')}/oauth/v1/token",
             )
         return BearerTokenAuthenticator(
             self,
@@ -163,7 +169,7 @@ class DynamicHubspotStream(HubspotStream):
         session.auth = self.authenticator
 
         resp = session.get(
-            f"https://api.hubapi.com/crm/v3/properties/{self.name}",
+            f"{self._api_base}/crm/v3/properties/{self.name}",
         )
         resp.raise_for_status()
         results = resp.json().get("results", [])

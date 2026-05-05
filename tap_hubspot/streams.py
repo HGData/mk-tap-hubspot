@@ -52,7 +52,7 @@ class ContactStream(DynamicIncrementalHubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
     def get_child_context(self, record: dict, context: Context | None) -> dict:
         """Return a context dictionary for child streams."""
@@ -124,7 +124,7 @@ class UsersStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/settings/v3"
+        return f"{self._api_base}/settings/v3"
 
 
 class OwnersStream(HubspotStream):
@@ -158,7 +158,7 @@ class OwnersStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class TicketPipelineStream(HubspotStream):
@@ -213,7 +213,7 @@ class TicketPipelineStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm-pipelines/v1"
+        return f"{self._api_base}/crm-pipelines/v1"
 
 
 class DealPipelineStream(HubspotStream):
@@ -268,7 +268,7 @@ class DealPipelineStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm-pipelines/v1"
+        return f"{self._api_base}/crm-pipelines/v1"
 
 
 class EmailSubscriptionStream(HubspotStream):
@@ -304,7 +304,7 @@ class EmailSubscriptionStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/email/public/v1"
+        return f"{self._api_base}/email/public/v1"
 
 
 class PropertyTicketStream(HubspotStream):
@@ -367,7 +367,7 @@ class PropertyTicketStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class PropertyDealStream(HubspotStream):
@@ -431,7 +431,7 @@ class PropertyDealStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class PropertyContactStream(HubspotStream):
@@ -494,7 +494,7 @@ class PropertyContactStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class PropertyCompanyStream(HubspotStream):
@@ -557,7 +557,7 @@ class PropertyCompanyStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class PropertyProductStream(HubspotStream):
@@ -620,7 +620,7 @@ class PropertyProductStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class PropertyLineItemStream(HubspotStream):
@@ -683,7 +683,7 @@ class PropertyLineItemStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class PropertyEmailStream(HubspotStream):
@@ -746,7 +746,7 @@ class PropertyEmailStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class PropertyPostalMailStream(HubspotStream):
@@ -809,7 +809,7 @@ class PropertyPostalMailStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class PropertyGoalStream(HubspotStream):
@@ -872,7 +872,7 @@ class PropertyGoalStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class PropertyCallStream(HubspotStream):
@@ -935,7 +935,7 @@ class PropertyCallStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class PropertyMeetingStream(HubspotStream):
@@ -998,7 +998,7 @@ class PropertyMeetingStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class PropertyTaskStream(HubspotStream):
@@ -1061,7 +1061,7 @@ class PropertyTaskStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class PropertyCommunicationStream(HubspotStream):
@@ -1124,7 +1124,7 @@ class PropertyCommunicationStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class PropertyNotesStream(HubspotStream):
@@ -1187,7 +1187,7 @@ class PropertyNotesStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
     def get_records(self, context: Context | None) -> t.Iterable[dict[str, t.Any]]:
         """Merges all the property stream data into a single property table."""
@@ -1250,7 +1250,7 @@ class CompanyStream(DynamicIncrementalHubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class DealStream(DynamicIncrementalHubspotStream):
@@ -1276,7 +1276,7 @@ class DealStream(DynamicIncrementalHubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
     @property
     def page_size(self) -> int:
@@ -1322,7 +1322,7 @@ class DealStream(DynamicIncrementalHubspotStream):
             return {}
 
         # Prepare the request
-        url = f"https://api.hubapi.com/crm/v4/associations/deal/{association_type}/batch/read"
+        url = f"{self._api_base}/crm/v4/associations/deal/{association_type}/batch/read"
         payload = {"inputs": [{"id": deal_id} for deal_id in deal_ids]}
 
         headers = {
@@ -1559,7 +1559,7 @@ class FeedbackSubmissionsStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class LineItemStream(DynamicIncrementalHubspotStream):
@@ -1585,7 +1585,7 @@ class LineItemStream(DynamicIncrementalHubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class ProductStream(HubspotStream):
@@ -1628,7 +1628,7 @@ class ProductStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class TicketStream(HubspotStream):
@@ -1670,7 +1670,7 @@ class TicketStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class QuoteStream(HubspotStream):
@@ -1712,7 +1712,7 @@ class QuoteStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class GoalStream(DynamicIncrementalHubspotStream):
@@ -1737,7 +1737,7 @@ class GoalStream(DynamicIncrementalHubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class CallStream(DynamicIncrementalHubspotStream):
@@ -1762,7 +1762,7 @@ class CallStream(DynamicIncrementalHubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class CommunicationStream(DynamicIncrementalHubspotStream):
@@ -1787,7 +1787,7 @@ class CommunicationStream(DynamicIncrementalHubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class EmailStream(DynamicIncrementalHubspotStream):
@@ -1803,7 +1803,7 @@ class EmailStream(DynamicIncrementalHubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class MeetingStream(DynamicIncrementalHubspotStream):
@@ -1828,7 +1828,7 @@ class MeetingStream(DynamicIncrementalHubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class NoteStream(DynamicIncrementalHubspotStream):
@@ -1853,7 +1853,7 @@ class NoteStream(DynamicIncrementalHubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class PostalMailStream(DynamicIncrementalHubspotStream):
@@ -1878,7 +1878,7 @@ class PostalMailStream(DynamicIncrementalHubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class TaskStream(DynamicIncrementalHubspotStream):
@@ -1903,7 +1903,7 @@ class TaskStream(DynamicIncrementalHubspotStream):
     @property
     def url_base(self) -> str:
         """Returns an updated path which includes the api version."""
-        return "https://api.hubapi.com/crm/v3"
+        return f"{self._api_base}/crm/v3"
 
 
 class EmailEventsStream(HubspotStream):
@@ -2005,7 +2005,7 @@ class EmailEventsStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns base url for email events."""
-        return "https://api.hubapi.com"
+        return self._api_base
 
     def get_next_page_token(
         self,
@@ -2333,7 +2333,7 @@ class WebEventsStream(HubspotStream):
     @property
     def url_base(self) -> str:
         """Returns base url for web events."""
-        return "https://api.hubapi.com"
+        return self._api_base
 
     def get_event_types(self) -> list[str]:
         """Fetch all available event types from the API."""
