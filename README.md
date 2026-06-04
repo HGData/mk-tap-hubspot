@@ -72,6 +72,16 @@ limit_events_month: 12
 # Result: Uses 2023-07-21 instead of the old 2020-01-01 state
 ```
 
+## Environment Variables
+
+### `HG_SIMULATOR_TAP_HUBSPOT_BASE_URL` (dev only)
+
+Optional override for the HubSpot API host. When set, every request the tap makes — both data calls and the OAuth token endpoint (`/oauth/v1/token`) — is sent to this host instead of `https://api.hubapi.com`. It is read directly from the process environment in `tap_hubspot/client.py` (it replaces the default value of the `BASE_HUBSPOT_API_URL` constant); it is not a `config.json` setting. A trailing slash, if present, is stripped.
+
+This variable is injected externally — it is not normally set by the tap or its callers. In MK's data ingestion pipeline it is supplied by `mk-airflow` (`dags/data_ingestion_core.py:_apply_simulator_overrides`), which reads the `mdi_simulator_overrides` MWAA Airflow Variable and writes the resulting env vars into the pull task's ECS `containerOverrides`. That injection is gated behind `env == "dev"`, so the variable is never set on production pull tasks. When unset (the default everywhere outside the dev MWAA), the tap behaves identically to upstream and hits the real HubSpot API.
+
+Intended use is to redirect a tenant's pull task at a hosted HubSpot simulator (`rgip-connector-simulators`, e.g. `https://hubspot-sim-01.hip.staging.hginsights.com`) for integration testing without touching production credentials.
+
 ## Elastic License 2.0
 
 The licensor grants you a non-exclusive, royalty-free, worldwide, non-sublicensable, non-transferable license to use, copy, distribute, make available, and prepare derivative works of the software.
