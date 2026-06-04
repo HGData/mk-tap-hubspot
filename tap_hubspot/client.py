@@ -29,11 +29,15 @@ if sys.version_info < (3, 11):
 _Auth = t.Callable[[requests.PreparedRequest], requests.PreparedRequest]
 
 # Single source of truth for the HubSpot API domain used by all streams and
-# requests. Defaults to the real HubSpot API; set HG_SIMULATOR_TAP_HUBSPOT_BASE_URL
-# to point the tap at a simulator host instead (dev/test only — unset in prod).
-BASE_HUBSPOT_API_URL = os.environ.get(
-    "HG_SIMULATOR_TAP_HUBSPOT_BASE_URL", "https://api.hubapi.com"
-).rstrip("/")
+# requests.
+BASE_HUBSPOT_API_URL = "https://api.hubapi.com"
+
+# Simulator override (dev/test only): when HG_SIMULATOR_TAP_HUBSPOT_BASE_URL is
+# set, route all requests at the simulator host instead of the real API. Unset
+# in prod, so prod behaviour is unchanged.
+_SIMULATOR_BASE_URL = os.environ.get("HG_SIMULATOR_TAP_HUBSPOT_BASE_URL")
+if _SIMULATOR_BASE_URL:
+    BASE_HUBSPOT_API_URL = _SIMULATOR_BASE_URL.rstrip("/")
 
 
 class HubspotStream(RESTStream):
