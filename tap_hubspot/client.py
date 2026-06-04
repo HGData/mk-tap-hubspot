@@ -28,6 +28,10 @@ if sys.version_info < (3, 11):
 
 _Auth = t.Callable[[requests.PreparedRequest], requests.PreparedRequest]
 
+# Single source of truth for the HubSpot API domain used by all streams and
+# requests. Override here to point the tap at a different host.
+BASE_HUBSPOT_API_URL = "https://api.hubapi.com"
+
 
 class HubspotStream(RESTStream):
     """tap-hubspot stream class."""
@@ -35,7 +39,7 @@ class HubspotStream(RESTStream):
     @property
     def url_base(self) -> str:
         """Returns base url."""
-        return "https://api.hubapi.com/"
+        return f"{BASE_HUBSPOT_API_URL}/"
 
     records_jsonpath = "$[*]"  # Or override `parse_response`.
 
@@ -51,7 +55,7 @@ class HubspotStream(RESTStream):
         if "refresh_token" in self.config:
             return HubSpotOAuthAuthenticator(
                 self,
-                auth_endpoint="https://api.hubapi.com/oauth/v1/token",
+                auth_endpoint=f"{BASE_HUBSPOT_API_URL}/oauth/v1/token",
             )
         return BearerTokenAuthenticator(
             self,
@@ -163,7 +167,7 @@ class DynamicHubspotStream(HubspotStream):
         session.auth = self.authenticator
 
         resp = session.get(
-            f"https://api.hubapi.com/crm/v3/properties/{self.name}",
+            f"{BASE_HUBSPOT_API_URL}/crm/v3/properties/{self.name}",
         )
         resp.raise_for_status()
         results = resp.json().get("results", [])
