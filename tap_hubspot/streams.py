@@ -2396,7 +2396,13 @@ class WebEventsStream(HubspotStream):
         return BASE_HUBSPOT_API_URL
 
     def get_event_types(self) -> list[str]:
-        """Fetch all available event types from the API."""
+        """Fetch all available event types from the API.
+
+        Retries on 429 via _fetch_page_with_retry.  Any other failure
+        propagates so the sync aborts rather than silently skipping
+        all web events (which would advance the bookmark and cause
+        unrecoverable data loss).
+        """
         event_types_url = f"{self.url_base}/events/v3/events/event-types"
 
         # Create session with proper authentication like FormSubmissionsStream
@@ -2405,15 +2411,16 @@ class WebEventsStream(HubspotStream):
         session.auth = self.authenticator
 
         try:
-            response = session.get(event_types_url, timeout=60)
-            response.raise_for_status()
-            data = response.json()
-            event_types = data.get("eventTypes", [])
-            self.logger.info(f"Found {len(event_types)} event types")
-            return event_types
-        except Exception as e:
-            self.logger.error(f"Failed to fetch event types: {e}")
-            return []
+            response = _fetch_page_with_retry(session, event_types_url, {})
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 403:
+                self.logger.warning("No permission for web events endpoint, skipping")
+                return []
+            raise
+        data = response.json()
+        event_types = data.get("eventTypes", [])
+        self.logger.info(f"Found {len(event_types)} event types")
+        return event_types
 
     def get_forms_mapping(self) -> dict[str, str]:
         """Fetch all forms and create a mapping from form ID to form name."""
