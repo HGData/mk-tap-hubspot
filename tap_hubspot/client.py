@@ -343,9 +343,7 @@ class DynamicIncrementalHubspotStream(DynamicHubspotStream):
                         progress_markers = self.get_context_state(context).get(  # type: ignore[union-attr]
                             "progress_markers", {}
                         )
-                        if progress_replication_value := progress_markers.get(
-                            "replication_key_value"
-                        ):
+                        if progress_replication_value := progress_markers.get("replication_key_value"):
                             # Use the most recent timestamp from progress markers and increment by 1 millisecond
                             progress_ts = strptime_to_utc(progress_replication_value)
                             ts = progress_ts + datetime.timedelta(milliseconds=1)
