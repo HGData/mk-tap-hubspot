@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import typing as t
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
+import tenacity
 from singer_sdk import typing as th  # JSON Schema typing helpers
+from singer_sdk.exceptions import RetriableAPIError
 
 from tap_hubspot.client import (
     BASE_HUBSPOT_API_URL,
@@ -28,6 +31,33 @@ ArrayType = th.ArrayType
 BooleanType = th.BooleanType
 IntegerType = th.IntegerType
 NumberType = th.NumberType
+
+_logger = logging.getLogger(__name__)
+
+
+def _is_rate_limited(exc: BaseException) -> bool:
+    return (
+        isinstance(exc, requests.exceptions.HTTPError)
+        and getattr(getattr(exc, "response", None), "status_code", None) == 429
+    )
+
+
+@tenacity.retry(
+    wait=tenacity.wait_exponential(multiplier=1, min=4, max=120),
+    stop=tenacity.stop_after_attempt(5),
+    retry=tenacity.retry_if_exception(_is_rate_limited),
+    before_sleep=tenacity.before_sleep_log(_logger, logging.WARNING),
+    reraise=True,
+)
+def _fetch_page_with_retry(
+    session: requests.Session,
+    url: str,
+    params: dict,
+) -> requests.Response:
+    """GET a single page, retrying with exponential backoff on HTTP 429."""
+    response = session.get(url, params=params, timeout=60)
+    response.raise_for_status()
+    return response
 
 
 class ContactStream(DynamicIncrementalHubspotStream):
@@ -2008,6 +2038,35 @@ class EmailEventsStream(HubspotStream):
         """Returns base url for email events."""
         return BASE_HUBSPOT_API_URL
 
+    def validate_response(self, response: requests.Response) -> None:
+        """Raise RetriableAPIError on 429 so tenacity can back off and retry."""
+        if response.status_code == 429:
+            raise RetriableAPIError(
+                f"Rate limited (429): {response.text[:200]}", response
+            )
+        super().validate_response(response)
+
+    def request_decorator(self, func: t.Callable) -> t.Callable:
+        """Replace SDK backoff with tenacity, retrying on 429 and transient errors."""
+        @tenacity.retry(
+            wait=tenacity.wait_exponential(multiplier=1, min=4, max=120),
+            stop=tenacity.stop_after_attempt(5),
+            retry=tenacity.retry_if_exception_type((
+                RetriableAPIError,
+                ConnectionResetError,
+                requests.exceptions.Timeout,
+                requests.exceptions.ConnectionError,
+                requests.exceptions.ChunkedEncodingError,
+                requests.exceptions.ContentDecodingError,
+            )),
+            before_sleep=tenacity.before_sleep_log(self.logger, logging.WARNING),
+            reraise=True,
+        )
+        def wrapper(*args: t.Any, **kwargs: t.Any) -> t.Any:
+            return func(*args, **kwargs)
+
+        return wrapper
+
     def get_next_page_token(
         self,
         response: requests.Response,
@@ -2337,7 +2396,13 @@ class WebEventsStream(HubspotStream):
         return BASE_HUBSPOT_API_URL
 
     def get_event_types(self) -> list[str]:
-        """Fetch all available event types from the API."""
+        """Fetch all available event types from the API.
+
+        Retries on 429 via _fetch_page_with_retry.  Any other failure
+        propagates so the sync aborts rather than silently skipping
+        all web events (which would advance the bookmark and cause
+        unrecoverable data loss).
+        """
         event_types_url = f"{self.url_base}/events/v3/events/event-types"
 
         # Create session with proper authentication like FormSubmissionsStream
@@ -2346,15 +2411,16 @@ class WebEventsStream(HubspotStream):
         session.auth = self.authenticator
 
         try:
-            response = session.get(event_types_url, timeout=60)
-            response.raise_for_status()
-            data = response.json()
-            event_types = data.get("eventTypes", [])
-            self.logger.info(f"Found {len(event_types)} event types")
-            return event_types
-        except Exception as e:
-            self.logger.error(f"Failed to fetch event types: {e}")
-            return []
+            response = _fetch_page_with_retry(session, event_types_url, {})
+        except requests.exceptions.HTTPError as e:
+            if e.response is not None and e.response.status_code == 403:
+                self.logger.warning("No permission for web events endpoint, skipping")
+                return []
+            raise
+        data = response.json()
+        event_types = data.get("eventTypes", [])
+        self.logger.info(f"Found {len(event_types)} event types")
+        return event_types
 
     def get_forms_mapping(self) -> dict[str, str]:
         """Fetch all forms and create a mapping from form ID to form name."""
@@ -2445,80 +2511,67 @@ class WebEventsStream(HubspotStream):
             next_page_token = None
 
             while True:
+                # Build URL and parameters
+                url = f"{self.url_base}/events/v3/events"
+                params = {
+                    "eventType": event_type,
+                    "limit": 1000,
+                }
+
+                # Add cursor for pagination
+                if next_page_token:
+                    params["after"] = next_page_token
+
+                # Add date range based on replication state
+                if starting_replication_value:
+                    params["occurredAfter"] = starting_replication_value
+
+                if self.config.get("end_date"):
+                    # Convert end_date to timestamp in milliseconds
+                    end_dt = datetime.datetime.fromisoformat(
+                        self.config["end_date"].replace("Z", "+00:00")
+                    )
+                    params["occurredBefore"] = int(end_dt.timestamp() * 1000)
+
                 try:
-                    # Build URL and parameters
-                    url = f"{self.url_base}/events/v3/events"
-                    params = {
-                        "eventType": event_type,
-                        "limit": 1000,
-                    }
-
-                    # Add cursor for pagination
-                    if next_page_token:
-                        params["after"] = next_page_token
-
-                    # Add date range based on replication state
-                    if starting_replication_value:
-                        params["occurredAfter"] = starting_replication_value
-
-                    if self.config.get("end_date"):
-                        # Convert end_date to timestamp in milliseconds
-                        end_dt = datetime.datetime.fromisoformat(
-                            self.config["end_date"].replace("Z", "+00:00")
-                        )
-                        params["occurredBefore"] = int(end_dt.timestamp() * 1000)
-
-                    # Make request
-                    response = session.get(url, params=params, timeout=60)
-
-                    # Handle 403 errors gracefully
-                    if response.status_code == 403:
-                        error_data = response.json()
+                    response = _fetch_page_with_retry(session, url, params)
+                except requests.exceptions.HTTPError as e:
+                    if (
+                        e.response is not None
+                        and e.response.status_code == 403
+                    ):
+                        error_data = e.response.json()
                         if "event-detail-read" in str(error_data):
                             self.logger.warning(
                                 f"Skipping event type '{event_type}' due to insufficient permissions: "
                                 f"requires 'event-detail-read' scope"
                             )
-                            break  # Skip to next event type
                         else:
-                            response.raise_for_status()
+                            self.logger.warning(
+                                f"Skipping event type '{event_type}' due to 403: {e}"
+                            )
+                        break  # 403 is usually permanent and intentional — skip to next event type
+                    raise  # re-raise 429 (exhausted retries), 5xx, etc.
 
-                    response.raise_for_status()
-                    data = response.json()
+                data = response.json()
 
-                    # Process results
-                    results = data.get("results", [])
-                    self.logger.info(f"Found {len(results)} events for {event_type}")
+                # Process results
+                results = data.get("results", [])
+                self.logger.info(f"Found {len(results)} events for {event_type}")
 
-                    for record in results:
-                        # Add event type to record for reference
-                        record["eventType"] = event_type
-                        processed_record = self.post_process(record, context)
-                        if processed_record:
-                            yield processed_record
+                for record in results:
+                    # Add event type to record for reference
+                    record["eventType"] = event_type
+                    processed_record = self.post_process(record, context)
+                    if processed_record:
+                        yield processed_record
 
-                    # Check for next page
-                    paging = data.get("paging")
-                    if paging and paging.get("next"):
-                        next_page_token = paging["next"]["after"]
-                    else:
-                        break  # No more pages for this event type
-
-                except requests.exceptions.RequestException as e:
-                    if (
-                        hasattr(e, "response")
-                        and e.response
-                        and e.response.status_code == 403
-                    ):
-                        self.logger.warning(
-                            f"Skipping event type '{event_type}' due to 403 permission error"
-                        )
-                        break  # Skip to next event type
-                    else:
-                        self.logger.error(
-                            f"Error fetching events for {event_type}: {e}"
-                        )
-                        break  # Skip to next event type on other errors
+                # Check for next page
+                paging = data.get("paging")
+                if paging and paging.get("next"):
+                    next_page_token = paging["next"]["after"]
+                else:
+                    break  # No more pages for this event type
 
     def get_starting_replication_key_value(
         self,
