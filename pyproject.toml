@@ -43,9 +43,16 @@ module = [
 [tool.ruff]
 src = ["tap_hubspot"]
 target-version = "py39"
+line-length = 120
 
 [tool.ruff.lint]
-select = ["ALL"]
+select = [
+  "E",    # pycodestyle errors
+  "F",    # pyflakes
+  "I",    # isort
+  "UP",   # pyupgrade
+  "W",    # pycodestyle warnings
+]
 
 [tool.ruff.lint.flake8-annotations]
 allow-star-arg-any = true
