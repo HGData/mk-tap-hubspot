@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import datetime
 import logging
-import math
 import typing as t
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -2223,61 +2222,6 @@ class EmailEventsStream(HubspotStream):
         }
 
 
-def _schema_types(property_schema: dict) -> list[str]:
-    """Return the JSON types a property schema allows, as a list."""
-    types = property_schema.get("type", [])
-    return [types] if isinstance(types, str) else list(types)
-
-
-def _parse_number(text: str, *, integer: bool) -> float | None:
-    """Read a number from text, or None when it is not a finite number.
-
-    With integer=True, a value with a fractional part is also None.
-    """
-    if integer:
-        try:
-            return int(text)
-        except ValueError:
-            pass
-    try:
-        number = float(text)
-    except ValueError:
-        return None
-    if not math.isfinite(number):
-        return None
-    if not integer:
-        return number
-    return int(number) if number.is_integer() else None
-
-
-def _convert_string_to_schema_type(value: str, property_schema: dict) -> t.Any:  # noqa: ANN401
-    """Convert a string to the JSON type its property schema declares.
-
-    The Event Analytics API returns every event property value as a string.
-    Left as is, a string in a number or integer property fails the target's
-    schema validation and stops the sync, and singer-sdk turns any string in a
-    boolean property into True, so "false" would be stored as True.
-
-    A value that cannot be read as the declared type becomes None, which every
-    declared type allows.
-    """
-    types = _schema_types(property_schema)
-    if "string" in types:
-        return value
-
-    text = value.strip()
-    if not text:
-        return None
-
-    if "boolean" in types:
-        return {"true": True, "false": False}.get(text.lower())
-
-    if "integer" in types or "number" in types:
-        return _parse_number(text, integer="integer" in types)
-
-    return value
-
-
 class WebEventsStream(HubspotStream):
     """HubSpot Web Events Stream.
 
@@ -2304,6 +2248,9 @@ class WebEventsStream(HubspotStream):
         Property("form_title", StringType),
         Property(
             "properties",
+            # The Event Analytics API returns every property value as a string,
+            # booleans and numbers included (its OpenAPI spec types them so), so
+            # every property is declared a string here.
             ObjectType(
                 Property("hs_base_url", StringType),
                 Property("hs_url", StringType),
@@ -2342,29 +2289,29 @@ class WebEventsStream(HubspotStream):
                 Property("hs_browser_type", StringType),
                 # Adding missing properties from the log
                 Property("hs_query_params", StringType),
-                Property("hs_is_virtual_url", BooleanType),
-                Property("hs_is_virtual_referrer", BooleanType),
-                Property("hs_is_external", BooleanType),
+                Property("hs_is_virtual_url", StringType),
+                Property("hs_is_virtual_referrer", StringType),
+                Property("hs_is_external", StringType),
                 Property("hs_browser_fingerprint", StringType),
                 Property("hs_historical_contact_associatedcompanyid", StringType),
                 Property("hs_hash_id", StringType),
-                Property("hs_is_new_cookie", BooleanType),
+                Property("hs_is_new_cookie", StringType),
                 Property("hs_historical_contact_lifecyclestage", StringType),
                 Property("hs_canonical_url", StringType),
                 Property("hs_targeted_content_aggregation", StringType),
                 Property("hs_visit_source", StringType),
                 Property("hs_page_id", StringType),
-                Property("hs_is_amp", BooleanType),
+                Property("hs_is_amp", StringType),
                 Property("hs_city", StringType),
-                Property("hs_is_in_chat_view", BooleanType),
+                Property("hs_is_in_chat_view", StringType),
                 Property("hs_visit_source_details_2", StringType),
                 Property("hs_visit_source_details_1", StringType),
                 # Adding more common properties that might appear
                 Property("hs_email", StringType),
                 Property("hs_contact_id", StringType),
                 Property("hs_ip_address", StringType),
-                Property("hs_latitude", NumberType),
-                Property("hs_longitude", NumberType),
+                Property("hs_latitude", StringType),
+                Property("hs_longitude", StringType),
                 Property("hs_state", StringType),
                 Property("hs_zip_code", StringType),
                 Property("hs_country_code", StringType),
@@ -2373,9 +2320,9 @@ class WebEventsStream(HubspotStream):
                 Property("hs_device_family", StringType),
                 Property("hs_os_family", StringType),
                 Property("hs_os_version", StringType),
-                Property("hs_mobile", BooleanType),
-                Property("hs_tablet", BooleanType),
-                Property("hs_bot", BooleanType),
+                Property("hs_mobile", StringType),
+                Property("hs_tablet", StringType),
+                Property("hs_bot", StringType),
                 Property("hs_search_keyword", StringType),
                 Property("hs_social_network", StringType),
                 Property("hs_utm_term", StringType),
@@ -2385,16 +2332,16 @@ class WebEventsStream(HubspotStream):
                 Property("hs_app_id", StringType),
                 Property("hs_visitor_id", StringType),
                 Property("hs_session_start", StringType),
-                Property("hs_session_timeout", IntegerType),
-                Property("hs_page_sequence", IntegerType),
+                Property("hs_session_timeout", StringType),
+                Property("hs_page_sequence", StringType),
                 Property("hs_visit_id", StringType),
-                Property("hs_visit_duration", IntegerType),
-                Property("hs_page_views", IntegerType),
-                Property("hs_bounce", BooleanType),
-                Property("hs_conversion", BooleanType),
+                Property("hs_visit_duration", StringType),
+                Property("hs_page_views", StringType),
+                Property("hs_bounce", StringType),
+                Property("hs_conversion", StringType),
                 Property("hs_goal_id", StringType),
-                Property("hs_goal_value", NumberType),
-                Property("hs_revenue", NumberType),
+                Property("hs_goal_value", StringType),
+                Property("hs_revenue", StringType),
                 Property("hs_content_group_1", StringType),
                 Property("hs_content_group_2", StringType),
                 Property("hs_content_group_3", StringType),
@@ -2407,11 +2354,11 @@ class WebEventsStream(HubspotStream):
                 Property("hs_custom_dimension_3", StringType),
                 Property("hs_custom_dimension_4", StringType),
                 Property("hs_custom_dimension_5", StringType),
-                Property("hs_custom_metric_1", NumberType),
-                Property("hs_custom_metric_2", NumberType),
-                Property("hs_custom_metric_3", NumberType),
-                Property("hs_custom_metric_4", NumberType),
-                Property("hs_custom_metric_5", NumberType),
+                Property("hs_custom_metric_1", StringType),
+                Property("hs_custom_metric_2", StringType),
+                Property("hs_custom_metric_3", StringType),
+                Property("hs_custom_metric_4", StringType),
+                Property("hs_custom_metric_5", StringType),
             ),
         ),
         Property("dt", StringType),
@@ -2656,18 +2603,6 @@ class WebEventsStream(HubspotStream):
             row["occurredAt"] = datetime.datetime.fromtimestamp(
                 row["occurredAt"] / 1000, tz=datetime.timezone.utc
             ).isoformat()
-
-        # Event property values arrive as strings; give each declared property
-        # the type its schema names before the record is validated.
-        properties = row.get("properties")
-        if isinstance(properties, dict):
-            declared = self.schema["properties"]["properties"].get("properties", {})
-            for name, value in properties.items():
-                if isinstance(value, str) and name in declared:
-                    properties[name] = _convert_string_to_schema_type(
-                        value,
-                        declared[name],
-                    )
 
         # Add form title based on hs_form_id mapping
         form_id = None
