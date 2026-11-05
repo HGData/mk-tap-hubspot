@@ -111,9 +111,7 @@ class ContactStream(DynamicIncrementalHubspotStream):
                 if props := row.get("properties"):
                     # Try alternative timestamp fields
                     replication_value = (
-                        props.get("lastmodifieddate")
-                        or props.get("hs_lastmodifieddate")
-                        or row.get("updatedAt")
+                        props.get("lastmodifieddate") or props.get("hs_lastmodifieddate") or row.get("updatedAt")
                     )
                     if replication_value:
                         row[self.replication_key] = replication_value
@@ -1378,9 +1376,7 @@ class DealStream(DynamicIncrementalHubspotStream):
                 deal_id = result.get("from", {}).get("id")
                 if deal_id:
                     associated_ids = [
-                        str(obj.get("toObjectId"))
-                        for obj in result.get("to", [])
-                        if obj.get("toObjectId")
+                        str(obj.get("toObjectId")) for obj in result.get("to", []) if obj.get("toObjectId")
                     ]
                     associations[deal_id] = associated_ids
 
@@ -1423,14 +1419,12 @@ class DealStream(DynamicIncrementalHubspotStream):
         with ThreadPoolExecutor(max_workers=2) as executor:
             # Submit all contact batch requests
             contact_futures = [
-                executor.submit(self._fetch_associations, batch, "contacts")
-                for batch in contact_batches
+                executor.submit(self._fetch_associations, batch, "contacts") for batch in contact_batches
             ]
 
             # Submit all company batch requests
             company_futures = [
-                executor.submit(self._fetch_associations, batch, "companies")
-                for batch in company_batches
+                executor.submit(self._fetch_associations, batch, "companies") for batch in company_batches
             ]
 
             # Collect contact results
@@ -1439,9 +1433,7 @@ class DealStream(DynamicIncrementalHubspotStream):
                     batch_result = future.result()
                     contact_associations.update(batch_result)
                 except Exception as e:
-                    self.logger.warning(
-                        f"Failed to fetch contact associations batch: {e}"
-                    )
+                    self.logger.warning(f"Failed to fetch contact associations batch: {e}")
 
             # Collect company results
             for future in as_completed(company_futures):
@@ -1449,9 +1441,7 @@ class DealStream(DynamicIncrementalHubspotStream):
                     batch_result = future.result()
                     company_associations.update(batch_result)
                 except Exception as e:
-                    self.logger.warning(
-                        f"Failed to fetch company associations batch: {e}"
-                    )
+                    self.logger.warning(f"Failed to fetch company associations batch: {e}")
 
         return contact_associations, company_associations
 
@@ -1472,9 +1462,7 @@ class DealStream(DynamicIncrementalHubspotStream):
             # When we reach batch size, process the batch
             if len(batch_records) >= BATCH_SIZE:
                 # Process this batch and yield results
-                yield from self._process_batch_with_associations(
-                    batch_records, batch_deal_ids
-                )
+                yield from self._process_batch_with_associations(batch_records, batch_deal_ids)
 
                 # Reset for next batch and explicit cleanup
                 batch_records.clear()
@@ -1484,9 +1472,7 @@ class DealStream(DynamicIncrementalHubspotStream):
 
         # Process final batch if any records remain
         if batch_records:
-            yield from self._process_batch_with_associations(
-                batch_records, batch_deal_ids
-            )
+            yield from self._process_batch_with_associations(batch_records, batch_deal_ids)
             # Final cleanup
             batch_records.clear()
             batch_deal_ids.clear()
@@ -1508,9 +1494,7 @@ class DealStream(DynamicIncrementalHubspotStream):
 
         try:
             # Fetch associations for this batch
-            contact_associations, company_associations = (
-                self._batch_fetch_all_associations(batch_deal_ids)
-            )
+            contact_associations, company_associations = self._batch_fetch_all_associations(batch_deal_ids)
 
             # Add associations to each record in the batch
             for record in batch_records:
@@ -1525,9 +1509,7 @@ class DealStream(DynamicIncrementalHubspotStream):
 
                     # Add company associations at root level
                     record["associatedCompanyIds"] = company_ids
-                    record["associatedCompanyId"] = (
-                        company_ids[0] if company_ids else None
-                    )
+                    record["associatedCompanyId"] = company_ids[0] if company_ids else None
                 else:
                     # No deal ID, set empty associations
                     record["associatedvids"] = []
@@ -2042,24 +2024,25 @@ class EmailEventsStream(HubspotStream):
     def validate_response(self, response: requests.Response) -> None:
         """Raise RetriableAPIError on 429 so tenacity can back off and retry."""
         if response.status_code == 429:
-            raise RetriableAPIError(
-                f"Rate limited (429): {response.text[:200]}", response
-            )
+            raise RetriableAPIError(f"Rate limited (429): {response.text[:200]}", response)
         super().validate_response(response)
 
     def request_decorator(self, func: t.Callable) -> t.Callable:
         """Replace SDK backoff with tenacity, retrying on 429 and transient errors."""
+
         @tenacity.retry(
             wait=tenacity.wait_exponential(multiplier=1, min=4, max=120),
             stop=tenacity.stop_after_attempt(5),
-            retry=tenacity.retry_if_exception_type((
-                RetriableAPIError,
-                ConnectionResetError,
-                requests.exceptions.Timeout,
-                requests.exceptions.ConnectionError,
-                requests.exceptions.ChunkedEncodingError,
-                requests.exceptions.ContentDecodingError,
-            )),
+            retry=tenacity.retry_if_exception_type(
+                (
+                    RetriableAPIError,
+                    ConnectionResetError,
+                    requests.exceptions.Timeout,
+                    requests.exceptions.ConnectionError,
+                    requests.exceptions.ChunkedEncodingError,
+                    requests.exceptions.ContentDecodingError,
+                )
+            ),
             before_sleep=tenacity.before_sleep_log(self.logger, logging.WARNING),
             reraise=True,
         )
@@ -2103,18 +2086,14 @@ class EmailEventsStream(HubspotStream):
             else:
                 # If it's a datetime string, convert to timestamp
                 try:
-                    dt = datetime.datetime.fromisoformat(
-                        str(starting_replication_value).replace("Z", "+00:00")
-                    )
+                    dt = datetime.datetime.fromisoformat(str(starting_replication_value).replace("Z", "+00:00"))
                     params["startTimestamp"] = int(dt.timestamp() * 1000)
                 except (ValueError, AttributeError):
                     # Fallback to effective start_date if parsing fails
                     effective_start_date = self._tap.get_effective_start_date()
                     if effective_start_date:
                         start_timestamp = int(
-                            datetime.datetime.fromisoformat(
-                                effective_start_date.replace("Z", "+00:00")
-                            ).timestamp()
+                            datetime.datetime.fromisoformat(effective_start_date.replace("Z", "+00:00")).timestamp()
                             * 1000
                         )
                         params["startTimestamp"] = start_timestamp
@@ -2123,19 +2102,13 @@ class EmailEventsStream(HubspotStream):
             effective_start_date = self._tap.get_effective_start_date()
             if effective_start_date:
                 start_timestamp = int(
-                    datetime.datetime.fromisoformat(
-                        effective_start_date.replace("Z", "+00:00")
-                    ).timestamp()
-                    * 1000
+                    datetime.datetime.fromisoformat(effective_start_date.replace("Z", "+00:00")).timestamp() * 1000
                 )
                 params["startTimestamp"] = start_timestamp
 
         if self.config.get("end_date"):
             end_timestamp = int(
-                datetime.datetime.fromisoformat(
-                    self.config["end_date"].replace("Z", "+00:00")
-                ).timestamp()
-                * 1000
+                datetime.datetime.fromisoformat(self.config["end_date"].replace("Z", "+00:00")).timestamp() * 1000
             )
             params["endTimestamp"] = end_timestamp
 
@@ -2152,11 +2125,9 @@ class EmailEventsStream(HubspotStream):
         # Apply limit_events_month to both state and start_date
         effective_start_date = self._tap.get_effective_start_date()
         effective_timestamp = None
-        
+
         if effective_start_date:
-            effective_dt = datetime.datetime.fromisoformat(
-                effective_start_date.replace("Z", "+00:00")
-            )
+            effective_dt = datetime.datetime.fromisoformat(effective_start_date.replace("Z", "+00:00"))
             effective_timestamp = int(effective_dt.timestamp() * 1000)
 
         # If we have a state value, compare it with the effective limit
@@ -2165,7 +2136,7 @@ class EmailEventsStream(HubspotStream):
                 try:
                     state_dt = datetime.datetime.fromisoformat(state_value.replace("Z", "+00:00"))
                     state_timestamp = int(state_dt.timestamp() * 1000)
-                    
+
                     # Use the more recent timestamp (later date = higher timestamp)
                     if effective_timestamp and state_timestamp < effective_timestamp:
                         self.logger.info(
@@ -2584,18 +2555,13 @@ class WebEventsStream(HubspotStream):
 
                 if self.config.get("end_date"):
                     # Convert end_date to timestamp in milliseconds
-                    end_dt = datetime.datetime.fromisoformat(
-                        self.config["end_date"].replace("Z", "+00:00")
-                    )
+                    end_dt = datetime.datetime.fromisoformat(self.config["end_date"].replace("Z", "+00:00"))
                     params["occurredBefore"] = int(end_dt.timestamp() * 1000)
 
                 try:
                     response = _fetch_page_with_retry(session, url, params)
                 except requests.exceptions.HTTPError as e:
-                    if (
-                        e.response is not None
-                        and e.response.status_code == 403
-                    ):
+                    if e.response is not None and e.response.status_code == 403:
                         error_data = e.response.json()
                         if "event-detail-read" in str(error_data):
                             self.logger.warning(
@@ -2603,9 +2569,7 @@ class WebEventsStream(HubspotStream):
                                 f"requires 'event-detail-read' scope"
                             )
                         else:
-                            self.logger.warning(
-                                f"Skipping event type '{event_type}' due to 403: {e}"
-                            )
+                            self.logger.warning(f"Skipping event type '{event_type}' due to 403: {e}")
                         break  # 403 is usually permanent and intentional — skip to next event type
                     raise  # re-raise 429 (exhausted retries), 5xx, etc.
 
@@ -2640,11 +2604,9 @@ class WebEventsStream(HubspotStream):
         # Apply limit_events_month to both state and start_date
         effective_start_date = self._tap.get_effective_start_date()
         effective_timestamp = None
-        
+
         if effective_start_date:
-            effective_dt = datetime.datetime.fromisoformat(
-                effective_start_date.replace("Z", "+00:00")
-            )
+            effective_dt = datetime.datetime.fromisoformat(effective_start_date.replace("Z", "+00:00"))
             effective_timestamp = int(effective_dt.timestamp() * 1000)
 
         # If we have a state value, compare it with the effective limit
@@ -2653,7 +2615,7 @@ class WebEventsStream(HubspotStream):
                 try:
                     state_dt = datetime.datetime.fromisoformat(state_value.replace("Z", "+00:00"))
                     state_timestamp = int(state_dt.timestamp() * 1000)
-                    
+
                     # Use the more recent timestamp (later date = higher timestamp)
                     if effective_timestamp and state_timestamp < effective_timestamp:
                         self.logger.info(
