@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import math
 import typing as t
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -2251,6 +2252,61 @@ class EmailEventsStream(HubspotStream):
         }
 
 
+def _schema_types(property_schema: dict) -> list[str]:
+    """Return the JSON types a property schema allows, as a list."""
+    types = property_schema.get("type", [])
+    return [types] if isinstance(types, str) else list(types)
+
+
+def _parse_number(text: str, *, integer: bool) -> float | None:
+    """Read a number from text, or None when it is not a finite number.
+
+    With integer=True, a value with a fractional part is also None.
+    """
+    if integer:
+        try:
+            return int(text)
+        except ValueError:
+            pass
+    try:
+        number = float(text)
+    except ValueError:
+        return None
+    if not math.isfinite(number):
+        return None
+    if not integer:
+        return number
+    return int(number) if number.is_integer() else None
+
+
+def _convert_string_to_schema_type(value: str, property_schema: dict) -> t.Any:  # noqa: ANN401
+    """Convert a string to the JSON type its property schema declares.
+
+    The Event Analytics API returns every event property value as a string.
+    Left as is, a string in a number or integer property fails the target's
+    schema validation and stops the sync, and singer-sdk turns any string in a
+    boolean property into True, so "false" would be stored as True.
+
+    A value that cannot be read as the declared type becomes None, which every
+    declared type allows.
+    """
+    types = _schema_types(property_schema)
+    if "string" in types:
+        return value
+
+    text = value.strip()
+    if not text:
+        return None
+
+    if "boolean" in types:
+        return {"true": True, "false": False}.get(text.lower())
+
+    if "integer" in types or "number" in types:
+        return _parse_number(text, integer="integer" in types)
+
+    return value
+
+
 class WebEventsStream(HubspotStream):
     """HubSpot Web Events Stream.
 
@@ -2638,6 +2694,18 @@ class WebEventsStream(HubspotStream):
             row["occurredAt"] = datetime.datetime.fromtimestamp(
                 row["occurredAt"] / 1000, tz=datetime.timezone.utc
             ).isoformat()
+
+        # Event property values arrive as strings; give each declared property
+        # the type its schema names before the record is validated.
+        properties = row.get("properties")
+        if isinstance(properties, dict):
+            declared = self.schema["properties"]["properties"].get("properties", {})
+            for name, value in properties.items():
+                if isinstance(value, str) and name in declared:
+                    properties[name] = _convert_string_to_schema_type(
+                        value,
+                        declared[name],
+                    )
 
         # Add form title based on hs_form_id mapping
         form_id = None
